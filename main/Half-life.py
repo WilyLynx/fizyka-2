@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import QLineEdit, QPushButton, QHBoxLayout
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
-from main.RadioactiveAtom import build_radioactive_collection
+from main.RadioactiveAtom import SeriesBuilder
 
 
 class HalfLife(QWidget):
@@ -18,10 +18,11 @@ class HalfLife(QWidget):
     DEF_MC_SIZE = 100
     SIM_END_RATIO = 0.01
 
-    def __init__(self, atoms, parent=None):
+    def __init__(self, series_builder, parent=None):
         super(HalfLife, self).__init__(parent)
 
-        self.build_atoms_mapping(atoms)
+        self.builder = series_builder
+        self.build_atoms_mapping(series_builder.get_series_by_name(builder.get_series_names()[0]))
         self.build_interface()
         self.plot()
 
@@ -44,6 +45,53 @@ class HalfLife(QWidget):
         self.center_main_window()
         self.show()
 
+    def build_editor(self):
+        series_label = QLabel("Select series", self)
+        self.series_list = self.build_series_list()
+        self.series_list.setCurrentRow(0)
+        atoms_label = QLabel("Select atom", self)
+        self.atoms_list = self.build_atom_list()
+        self.atoms_list.setCurrentRow(0)
+        batch_size_label = QLabel("Set MC batch size", self)
+        self.batch_editor = QLineEdit()
+        self.batch_editor.setValidator(QIntValidator(1, HalfLife.MAX_MC_SIZE))
+        self.batch_editor.setPlaceholderText(QC.translate('', f'Default value: {HalfLife.DEF_MC_SIZE}'))
+        startBtn = QPushButton("&Plot", self)
+        startBtn.clicked.connect(self.plot)
+        self.series_list.currentItemChanged.connect(self.change_series)
+        editor_layout = QVBoxLayout()
+        editor_layout.addWidget(series_label)
+        editor_layout.addWidget(self.series_list)
+        editor_layout.addWidget(atoms_label)
+        editor_layout.addWidget(self.atoms_list)
+        editor_layout.addWidget(batch_size_label)
+        editor_layout.addWidget(self.batch_editor)
+        editor_layout.addWidget(startBtn)
+        return editor_layout
+
+    def build_series_list(self):
+        series = QListWidget()
+        series.addItems(self.builder.get_series_names())
+        return series
+
+    def build_atom_list(self):
+        atom_list = QListWidget()
+        atom_list.addItems(self.atoms_map.keys())
+        return atom_list
+
+    def center_main_window(self):
+        qtRectangle = self.frameGeometry()
+        centerPoint = QDesktopWidget().availableGeometry().center()
+        qtRectangle.moveCenter(centerPoint)
+        self.move(qtRectangle.topLeft())
+
+    def change_series(self):
+        selected_series = self.series_list.currentItem().text()
+        self.build_atoms_mapping(self.builder.get_series_by_name(selected_series))
+        self.atoms_list.clear()
+        self.atoms_list.addItems(self.atoms_map.keys())
+        self.atoms_list.setCurrentRow(0)
+
     def build_plot_area(self):
         self.figure = plt.figure()
         self.canvas = FigureCanvas(self.figure)
@@ -52,35 +100,6 @@ class HalfLife(QWidget):
         plot_layout.addWidget(self.toolbar)
         plot_layout.addWidget(self.canvas)
         return plot_layout
-
-    def build_editor(self):
-        particle_label = QLabel("Select particle", self)
-        self.atoms_list = self.build_particles_list()
-        self.atoms_list.setCurrentRow(0)
-        batch_size_label = QLabel("Set MC batch size", self)
-        self.batch_editor = QLineEdit()
-        self.batch_editor.setValidator(QIntValidator(1, HalfLife.MAX_MC_SIZE))
-        self.batch_editor.setPlaceholderText(QC.translate('', f'Default value: {HalfLife.DEF_MC_SIZE}'))
-        startBtn = QPushButton("&Plot", self)
-        startBtn.clicked.connect(self.plot)
-        editor_grid = QGridLayout()
-        editor_grid.addWidget(particle_label, 0, 0)
-        editor_grid.addWidget(self.atoms_list, 1, 0)
-        editor_grid.addWidget(batch_size_label, 2, 0)
-        editor_grid.addWidget(self.batch_editor, 3, 0)
-        editor_grid.addWidget(startBtn, 4, 0)
-        return editor_grid
-
-    def build_particles_list(self):
-        particle_list = QListWidget()
-        particle_list.addItems(self.atoms_map.keys())
-        return particle_list
-
-    def center_main_window(self):
-        qtRectangle = self.frameGeometry()
-        centerPoint = QDesktopWidget().availableGeometry().center()
-        qtRectangle.moveCenter(centerPoint)
-        self.move(qtRectangle.topLeft())
 
     def plot(self):
         MC_sim_size, atom = self.read_plot_parameters()
@@ -91,6 +110,7 @@ class HalfLife(QWidget):
         ax.legend()
         ax.set_xlabel(atom.unit)
         ax.set_ylabel('N')
+        ax.set_title(f'{atom.name} {atom.symbol}   T_1/2 = {atom.half_life} {atom.unit}')
         self.canvas.draw()
 
     def read_plot_parameters(self):
@@ -126,7 +146,7 @@ class HalfLife(QWidget):
 
 
 if __name__ == '__main__':
-    atoms = build_radioactive_collection()
+    builder = SeriesBuilder()
     app = QApplication(sys.argv)
-    window = HalfLife(atoms)
+    window = HalfLife(builder)
     sys.exit(app.exec_())
