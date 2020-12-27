@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import QLineEdit, QPushButton, QHBoxLayout
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
-from main.RadioactiveAtom import SeriesBuilder
+from RadioactiveAtom import SeriesBuilder
 
 
 class HalfLife(QWidget):
